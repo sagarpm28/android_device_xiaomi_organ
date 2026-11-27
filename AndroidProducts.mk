@@ -4,9 +4,10 @@
 #
 
 PRODUCT_MAKEFILES := \
+    $(LOCAL_DIR)/lunaris_organ.mk \
     $(LOCAL_DIR)/lineage_organ.mk
 
 COMMON_LUNCH_CHOICES := \
-    lineage_organ-user \
-    lineage_organ-userdebug \
-    lineage_organ-eng
+    lunaris_organ-bp2a-userdebug \
+    lunaris_organ-userdebug \
+    lineage_organ-userdebug

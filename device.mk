@@ -3,21 +3,28 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# Enable updating of APEXes
-$(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
+DEVICE_PATH := device/xiaomi/organ
 
-# A/B
-$(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota.mk)
+# Inherit proprietary vendor blobs
+$(call inherit-product, vendor/xiaomi/organ/organ-vendor.mk)
 
-PRODUCT_PACKAGES += \
-    android.hardware.boot@1.2-impl \
-    android.hardware.boot@1.2-impl.recovery \
-    android.hardware.boot@1.2-service
+# Vendor blobs frozen at API 34 (VNDK v34), shipping API 35
+PRODUCT_EXTRA_VNDK_VERSIONS := 34
+PRODUCT_SHIPPING_API_LEVEL := 35
+PRODUCT_VENDOR_PROPERTIES += ro.board.api_level=34
 
+# Dynamic partitions + Virtual A/B
+PRODUCT_USE_DYNAMIC_PARTITIONS := true
+$(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota/vabc_features.mk)
+PRODUCT_VIRTUAL_AB_COMPRESSION_METHOD := lz4
+
+# A/B & fastbootd
 PRODUCT_PACKAGES += \
     update_engine \
     update_engine_sideload \
-    update_verifier
+    update_verifier \
+    otapreopt_script \
+    fastbootd
 
 AB_OTA_POSTINSTALL_CONFIG += \
     RUN_POSTINSTALL_system=true \
@@ -25,40 +32,55 @@ AB_OTA_POSTINSTALL_CONFIG += \
     FILESYSTEM_TYPE_system=erofs \
     POSTINSTALL_OPTIONAL_system=true
 
-AB_OTA_POSTINSTALL_CONFIG += \
-    RUN_POSTINSTALL_vendor=true \
-    POSTINSTALL_PATH_vendor=bin/checkpoint_gc \
-    FILESYSTEM_TYPE_vendor=erofs \
-    POSTINSTALL_OPTIONAL_vendor=true
+# Tablet, 320 dpi (xhdpi)
+PRODUCT_CHARACTERISTICS := tablet
+PRODUCT_AAPT_CONFIG := normal large xlarge
+PRODUCT_AAPT_PREF_CONFIG := xhdpi
+PRODUCT_PRODUCT_PROPERTIES += ro.sf.lcd_density=320
 
+# Emulated storage
+$(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
+
+# First-stage fstab (vendor_boot ramdisk)
+PRODUCT_COPY_FILES += \
+    $(DEVICE_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.qcom
+
+# GKI kernel
+PRODUCT_COPY_FILES += \
+    $(DEVICE_PATH)/prebuilt/gki/Image:kernel
+
+# Stock vendor uses HIDL HALs
+PRODUCT_HIDL_ENABLED := true
 PRODUCT_PACKAGES += \
-    checkpoint_gc \
-    otapreopt_script
+    hwservicemanager \
+    android.hidl.allocator@1.0-service \
+    android.hidl.memory@1.0-impl
 
-# API levels
-PRODUCT_SHIPPING_API_LEVEL := 35
-
-# fastbootd
+# Recovery packages
 PRODUCT_PACKAGES += \
-    android.hardware.fastboot@1.1-impl-mock \
-    fastbootd
+    adbd.recovery \
+    cgroups.recovery.json \
+    charger.recovery \
+    init_second_stage.recovery \
+    ld.config.recovery.txt \
+    linker.recovery \
+    otacerts.recovery \
+    recovery \
+    servicemanager.recovery \
+    shell_and_utilities_recovery \
+    watchdogd.recovery \
+    odm-build.prop \
+    vendor_compatibility_matrix.xml
 
-# Health
-PRODUCT_PACKAGES += \
-    android.hardware.health@2.1-impl \
-    android.hardware.health@2.1-service
+# SELinux genfs_labels_version
+PRODUCT_COPY_FILES += \
+    $(DEVICE_PATH)/sepolicy/genfs_labels_version.txt:$(TARGET_COPY_OUT_VENDOR)/etc/selinux/genfs_labels_version.txt
 
-# Kernel
+# Kernel UFFD GC
 PRODUCT_ENABLE_UFFD_GC := true
 
 # Overlays
 PRODUCT_ENFORCE_RRO_TARGETS := *
-
-# Partitions
-PRODUCT_USE_DYNAMIC_PARTITIONS := true
-
-# Product characteristics
-PRODUCT_CHARACTERISTICS := tablet
 
 # Rootdir
 PRODUCT_PACKAGES += \
@@ -98,22 +120,14 @@ PRODUCT_PACKAGES += \
     qca6234-service.sh \
     system_dlkm_modprobe.sh \
     vendor_modprobe.sh \
-
-PRODUCT_PACKAGES += \
     fstab.qcom \
     init.qcom.factory.rc \
     init.qcom.rc \
     init.qcom.usb.rc \
     init.qti.kernel.rc \
     init.qti.ufs.rc \
-    init.target.rc \
-
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/rootdir/etc/fstab.qcom:$(TARGET_VENDOR_RAMDISK_OUT)/first_stage_ramdisk/fstab.qcom
+    init.target.rc
 
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
     $(LOCAL_PATH)
-
-# Inherit the proprietary files
-$(call inherit-product, vendor/xiaomi/organ/organ-vendor.mk)
